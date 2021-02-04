@@ -46,6 +46,9 @@ class Encoder(nn.Module):
             import pretrainedmodels
             resnet = pretrainedmodels.__dict__['se_resnext50_32x4d'](num_classes=1000, pretrained='imagenet')
             from blocks import SEResNeXtBottleneck
+        if opt.backbone == 'resnext50_32x4d':
+            import torch
+            resnet = torch.hub.load('pytorch/vision:v0.8.2', 'resnext50_32x4d', pretrained=True)
         if opt.backbone == 'se_resnet50':
             import pretrainedmodels
             resnet = pretrainedmodels.__dict__['se_resnet50'](num_classes=1000, pretrained='imagenet')
