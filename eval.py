@@ -10,8 +10,9 @@ from model import ft_net
 from data import make_data_loader
 from opt import opt
 
-opt.data_path = '../DukeMTMC-reID'
+opt.data_path = 'DukeMTMC-reID'
 train_loader, train_loader_woEr, test_loader, query_loader, dataset = make_data_loader(opt)
+#model = ft_net(class_num=702, droprate=0.5, stride=1)
 model = ft_net(class_num=702)
 model.eval()
 model.cuda()
