@@ -5,6 +5,7 @@ from model import ft_net
 from scipy.spatial.distance import cdist
 from torch.optim import lr_scheduler
 from utils.metrics import mean_ap, cmc, re_ranking
+from data import make_data_loader
 
 opt.epoch = 60
 model = ft_net(opt.num_cls, droprate=0.5, stride=1)
