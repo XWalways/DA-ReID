@@ -10,7 +10,10 @@ from tabulate import tabulate
 from termcolor import colored
 
 #Support Market1501, CUHK03, DukeMTMC Person Re-ID Datasets
-__all__ = ['Market1501', 'CUHK03', 'DukeMTMC']
+__all__ = ['Market1501', 'CUHK03', 'DukeMTMC', 'MSMT17', 
+           'VeRi', 'VehicleID', 'VeRiWild',
+           'SmallVehicleID', 'MediumVehicleID', 'LargeVehicleID', 
+           'SmallVeRiWild', 'MediumVeRiWild', 'LargeVeRiWild']
 
 class Dataset(object):
     """An abstract class representing a Dataset.
@@ -181,7 +184,7 @@ class Market1501(ImageDataset):
     dataset_url = 'http://188.138.127.15:81/Datasets/Market-1501-v15.09.15.zip'
     dataset_name = "market1501"
 
-    def __init__(self, root='./', market1501_500k=False, **kwargs):
+    def __init__(self, root='datasets', market1501_500k=False, **kwargs):
         # self.root = os.path.abspath(os.path.expanduser(root))
         self.root = root
         self.dataset_dir = os.path.join(self.root, self.dataset_dir)
@@ -254,7 +257,7 @@ class DukeMTMC(ImageDataset):
     dataset_url = 'http://vision.cs.duke.edu/DukeMTMC/data/misc/DukeMTMC-reID.zip'
     dataset_name = "dukemtmc"
 
-    def __init__(self, root='./', **kwargs):
+    def __init__(self, root='datasets', **kwargs):
         # self.root = os.path.abspath(os.path.expanduser(root))
         self.root = root
         self.dataset_dir = os.path.join(self.root, self.dataset_dir)
@@ -306,7 +309,7 @@ class CUHK03(ImageDataset):
     dataset_dir = 'cuhk03'
     dataset_url = None
     dataset_name = "cuhk03"
-    def __init__(self, root='./', **kwargs):
+    def __init__(self, root='datasets', **kwargs):
         self.root = root
         self.dataset_dir = osp.join(self.root, self.dataset_dir)
         self.train_dir = osp.join(self.dataset_dir, 'bounding_box_train')
@@ -340,3 +343,376 @@ class CUHK03(ImageDataset):
             data.append((img_path, pid, camid))
 
         return data
+
+class MSMT17(ImageDataset):
+    """MSMT17.
+    Reference:
+        Wei et al. Person Transfer GAN to Bridge Domain Gap for Person Re-Identification. CVPR 2018.
+    URL: `<http://www.pkuvmc.com/publications/msmt17.html>`_
+    Dataset statistics:
+        - identities: 4101.
+        - images: 32621 (train) + 11659 (query) + 82161 (gallery).
+        - cameras: 15.
+    """
+    TRAIN_DIR_KEY = 'train_dir'
+    TEST_DIR_KEY = 'test_dir'
+    VERSION_DICT = {
+        'MSMT17_V1': {
+            TRAIN_DIR_KEY: 'train',
+            TEST_DIR_KEY: 'test',
+        },
+        'MSMT17_V2': {
+            TRAIN_DIR_KEY: 'mask_train_v2',
+            TEST_DIR_KEY: 'mask_test_v2',
+        }
+    }
+    dataset_url = None
+    dataset_name = 'msmt17'
+
+    def __init__(self, root='datasets', **kwargs):
+        self.dataset_dir = root
+
+        has_main_dir = False
+        for main_dir in VERSION_DICT:
+            if osp.exists(osp.join(self.dataset_dir, main_dir)):
+                train_dir = VERSION_DICT[main_dir][TRAIN_DIR_KEY]
+                test_dir = VERSION_DICT[main_dir][TEST_DIR_KEY]
+                has_main_dir = True
+                break
+        assert has_main_dir, 'Datset folder not found'
+
+        self.train_dir = osp.join(self.dataset_dir, main_dir, train_dir)
+        self.test_dir = osp.join(self.dataset_dir, main_dir, test_dir)
+        self.list_train_path = osp.join(self.dataset_dir, main_dir, 'list_train.txt')
+        self.list_val_path = osp.join(self.dataset_dir, main_dir, 'list_val.txt')
+        self.list_query_path = osp.join(self.dataset_dir, main_dir, 'list_query.txt')
+        self.list_gallery_path = osp.join(self.dataset_dir, main_dir, 'list_gallery.txt')
+
+        required_files = [
+            self.dataset_dir,
+            self.train_dir,
+            self.test_dir
+        ]
+        self.check_before_run(required_files)
+
+        train = self.process_dir(self.train_dir, self.list_train_path)
+        val = self.process_dir(self.train_dir, self.list_val_path)
+        query = self.process_dir(self.test_dir, self.list_query_path, is_train=False)
+        gallery = self.process_dir(self.test_dir, self.list_gallery_path, is_train=False)
+
+        um_train_pids = self.get_num_pids(train)
+        query_tmp = []
+        for img_path, pid, camid in query:
+            query_tmp.append((img_path, pid+num_train_pids, camid))
+        del query
+        query = query_tmp
+
+        gallery_temp = []
+        for img_path, pid, camid in gallery:
+            gallery_temp.append((img_path, pid+num_train_pids, camid))
+        del gallery
+        gallery = gallery_temp
+
+        # Note: to fairly compare with published methods on the conventional ReID setting,
+        #       do not add val images to the training set.
+        if 'combineall' in kwargs and kwargs['combineall']:
+            train += val
+        super(MSMT17, self).__init__(train, query, gallery, **kwargs)
+
+
+    def process_dir(self, dir_path, list_path, is_train=True):
+        with open(list_path, 'r') as txt:
+            lines = txt.readlines()
+
+        data = []
+
+        for img_idx, img_info in enumerate(lines):
+            img_path, pid = img_info.split(' ')
+            pid = int(pid)  # no need to relabel
+            camid = int(img_path.split('_')[2]) - 1  # index starts from 0
+            img_path = osp.join(dir_path, img_path)
+            if is_train:
+                pid = self.dataset_name + "_" + str(pid)
+                camid = self.dataset_name + "_" + str(camid)
+            data.append((img_path, pid, camid))
+
+        return data
+
+
+class VeRi(ImageDataset):
+    """VeRi.
+    Reference:
+        Xinchen Liu et al. A Deep Learning based Approach for Progressive Vehicle Re-Identification. ECCV 2016.
+        Xinchen Liu et al. PROVID: Progressive and Multimodal Vehicle Reidentification for Large-Scale Urban Surveillance. IEEE TMM 2018.
+    URL: `<https://vehiclereid.github.io/VeRi/>`_
+    Dataset statistics:
+        - identities: 775.
+        - images: 37778 (train) + 1678 (query) + 11579 (gallery).
+    """
+    dataset_dir = "veri"
+    dataset_name = "veri"
+
+    def __init__(self, root='datasets', **kwargs):
+        self.dataset_dir = osp.join(root, self.dataset_dir)
+
+        self.train_dir = osp.join(self.dataset_dir, 'image_train')
+        self.query_dir = osp.join(self.dataset_dir, 'image_query')
+        self.gallery_dir = osp.join(self.dataset_dir, 'image_test')
+
+        required_files = [
+            self.dataset_dir,
+            self.train_dir,
+            self.query_dir,
+            self.gallery_dir,
+        ]
+        self.check_before_run(required_files)
+
+        train = self.process_dir(self.train_dir)
+        query = self.process_dir(self.query_dir, is_train=False)
+        gallery = self.process_dir(self.gallery_dir, is_train=False)
+
+        super(VeRi, self).__init__(train, query, gallery, **kwargs)
+
+    def process_dir(self, dir_path, is_train=True):
+        img_paths = glob.glob(osp.join(dir_path, '*.jpg'))
+        pattern = re.compile(r'([\d]+)_c(\d\d\d)')
+
+        data = []
+        for img_path in img_paths:
+            pid, camid = map(int, pattern.search(img_path).groups())
+            if pid == -1: continue  # junk images are just ignored
+            assert 0 <= pid <= 776
+            assert 1 <= camid <= 20
+            camid -= 1  # index starts from 0
+            if is_train:
+                pid = self.dataset_name + "_" + str(pid)
+                camid = self.dataset_name + "_" + str(camid)
+            data.append((img_path, pid, camid))
+
+        return data
+
+
+class VehicleID(ImageDataset):
+    """VehicleID.
+    Reference:
+        Liu et al. Deep relative distance learning: Tell the difference between similar vehicles. CVPR 2016.
+    URL: `<https://pkuml.org/resources/pku-vehicleid.html>`_
+    Train dataset statistics:
+        - identities: 13164.
+        - images: 113346.
+    """
+    dataset_dir = "vehicleid"
+    dataset_name = "vehicleid"
+
+    def __init__(self, root='datasets', test_list='', **kwargs):
+        self.dataset_dir = osp.join(root, self.dataset_dir)
+
+        self.image_dir = osp.join(self.dataset_dir, 'image')
+        self.train_list = osp.join(self.dataset_dir, 'train_test_split/train_list.txt')
+        if test_list:
+            self.test_list = test_list
+        else:
+            self.test_list = osp.join(self.dataset_dir, 'train_test_split/test_list_13164.txt')
+
+        required_files = [
+            self.dataset_dir,
+            self.image_dir,
+            self.train_list,
+            self.test_list,
+        ]
+        self.check_before_run(required_files)
+
+        train = self.process_dir(self.train_list, is_train=True)
+        query, gallery = self.process_dir(self.test_list, is_train=False)
+
+        super(VehicleID, self).__init__(train, query, gallery, **kwargs)
+
+    def process_dir(self, list_file, is_train=True):
+        img_list_lines = open(list_file, 'r').readlines()
+
+        dataset = []
+        for idx, line in enumerate(img_list_lines):
+            line = line.strip()
+            vid = int(line.split(' ')[1])
+            imgid = line.split(' ')[0]
+            img_path = osp.join(self.image_dir, imgid + '.jpg')
+            if is_train:
+                vid = self.dataset_name + "_" + str(vid)
+            dataset.append((img_path, vid, int(imgid)))
+
+        if is_train: return dataset
+        else:
+            random.shuffle(dataset)
+            vid_container = set()
+            query = []
+            gallery = []
+            for sample in dataset:
+                if sample[1] not in vid_container:
+                    vid_container.add(sample[1])
+                    gallery.append(sample)
+                else:
+                    query.append(sample)
+
+            return query, gallery
+
+
+class SmallVehicleID(VehicleID):
+    """VehicleID.
+    Small test dataset statistics:
+        - identities: 800.
+        - images: 6493.
+    """
+
+    def __init__(self, root='datasets', **kwargs):
+        dataset_dir = osp.join(root, self.dataset_dir)
+        self.test_list = osp.join(dataset_dir, 'train_test_split/test_list_800.txt')
+
+        super(SmallVehicleID, self).__init__(root, self.test_list, **kwargs)
+
+class MediumVehicleID(VehicleID):
+    """VehicleID.
+    Medium test dataset statistics:
+        - identities: 1600.
+        - images: 13377.
+    """
+
+    def __init__(self, root='datasets', **kwargs):
+        dataset_dir = osp.join(root, self.dataset_dir)
+        self.test_list = osp.join(dataset_dir, 'train_test_split/test_list_1600.txt')
+
+        super(MediumVehicleID, self).__init__(root, self.test_list, **kwargs)
+
+class LargeVehicleID(VehicleID):
+    """VehicleID.
+    Large test dataset statistics:
+        - identities: 2400.
+        - images: 19777.
+    """
+
+    def __init__(self, root='datasets', **kwargs):
+        dataset_dir = osp.join(root, self.dataset_dir)
+        self.test_list = osp.join(dataset_dir, 'train_test_split/test_list_2400.txt')
+
+        super(LargeVehicleID, self).__init__(root, self.test_list, **kwargs)
+
+
+class VeRiWild(ImageDataset):
+    """VeRi-Wild.
+    Reference:
+        Lou et al. A Large-Scale Dataset for Vehicle Re-Identification in the Wild. CVPR 2019.
+    URL: `<https://github.com/PKU-IMRE/VERI-Wild>`_
+    Train dataset statistics:
+        - identities: 30671.
+        - images: 277797.
+    """
+    dataset_dir = "VERI-Wild"
+    dataset_name = "veriwild"
+
+    def __init__(self, root='datasets', query_list='', gallery_list='', **kwargs):
+        self.dataset_dir = osp.join(root, self.dataset_dir)
+
+        self.image_dir = osp.join(self.dataset_dir, 'images')
+        self.train_list = osp.join(self.dataset_dir, 'train_test_split/train_list.txt')
+        self.vehicle_info = osp.join(self.dataset_dir, 'train_test_split/vehicle_info.txt')
+        if query_list and gallery_list:
+            self.query_list = query_list
+            self.gallery_list = gallery_list
+        else:
+            self.query_list = osp.join(self.dataset_dir, 'train_test_split/test_10000_query.txt')
+            self.gallery_list = osp.join(self.dataset_dir, 'train_test_split/test_10000.txt')
+
+        required_files = [
+            self.image_dir,
+            self.train_list,
+            self.query_list,
+            self.gallery_list,
+            self.vehicle_info,
+        ]
+        self.check_before_run(required_files)
+
+        self.imgid2vid, self.imgid2camid, self.imgid2imgpath = self.process_vehicle(self.vehicle_info)
+
+        train = self.process_dir(self.train_list)
+        query = self.process_dir(self.query_list, is_train=False)
+        gallery = self.process_dir(self.gallery_list, is_train=False)
+
+        super(VeRiWild, self).__init__(train, query, gallery, **kwargs)
+
+    def process_dir(self, img_list, is_train=True):
+        img_list_lines = open(img_list, 'r').readlines()
+
+        dataset = []
+        for idx, line in enumerate(img_list_lines):
+            line = line.strip()
+            vid = int(line.split('/')[0])
+            imgid = line.split('/')[1]
+            if is_train:
+                vid = self.dataset_name + "_" + str(vid)
+            dataset.append((self.imgid2imgpath[imgid], vid, int(self.imgid2camid[imgid])))
+
+        assert len(dataset) == len(img_list_lines)
+        return dataset
+
+    def process_vehicle(self, vehicle_info):
+        imgid2vid = {}
+        imgid2camid = {}
+        imgid2imgpath = {}
+        vehicle_info_lines = open(vehicle_info, 'r').readlines()
+
+        for idx, line in enumerate(vehicle_info_lines[1:]):
+            vid = line.strip().split('/')[0]
+            imgid = line.strip().split(';')[0].split('/')[1]
+            camid = line.strip().split(';')[1]
+            img_path = osp.join(self.image_dir, vid, imgid + '.jpg')
+            imgid2vid[imgid] = vid
+            imgid2camid[imgid] = camid
+            imgid2imgpath[imgid] = img_path
+
+        assert len(imgid2vid) == len(vehicle_info_lines) - 1
+        return imgid2vid, imgid2camid, imgid2imgpath
+
+
+class SmallVeRiWild(VeRiWild):
+    """VeRi-Wild.
+    Small test dataset statistics:
+        - identities: 3000.
+        - images: 41861.
+    """
+
+    def __init__(self, root='datasets', **kwargs):
+        dataset_dir = osp.join(root, self.dataset_dir)
+        self.query_list = osp.join(dataset_dir, 'train_test_split/test_3000_query.txt')
+        self.gallery_list = osp.join(dataset_dir, 'train_test_split/test_3000.txt')
+
+        super(SmallVeRiWild, self).__init__(root, self.query_list, self.gallery_list, **kwargs)
+
+
+class MediumVeRiWild(VeRiWild):
+    """VeRi-Wild.
+    Medium test dataset statistics:
+        - identities: 5000.
+        - images: 69389.
+    """
+
+    def __init__(self, root='datasets', **kwargs):
+        dataset_dir = osp.join(root, self.dataset_dir)
+        self.query_list = osp.join(dataset_dir, 'train_test_split/test_5000_query.txt')
+        self.gallery_list = osp.join(dataset_dir, 'train_test_split/test_5000.txt')
+
+        super(MediumVeRiWild, self).__init__(root, self.query_list, self.gallery_list, **kwargs)
+
+
+
+class LargeVeRiWild(VeRiWild):
+    """VeRi-Wild.
+    Large test dataset statistics:
+        - identities: 10000.
+        - images: 138517.
+    """
+
+    def __init__(self, root='datasets', **kwargs):
+        dataset_dir = osp.join(root, self.dataset_dir)
+        self.query_list = osp.join(dataset_dir, 'train_test_split/test_10000_query.txt')
+        self.gallery_list = osp.join(dataset_dir, 'train_test_split/test_10000.txt')
+
+        super(LargeVeRiWild, self).__init__(root, self.query_list, self.gallery_list, **kwargs)
