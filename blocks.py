@@ -51,6 +51,44 @@ class Bottleneck(nn.Module):
 
         return out
 
+class ResNeXtBottleneck(nn.Module):
+    expansion=4
+    def __init__(self, inplanes, planes, groups, stride=1, downsample=None, dilation=1, base_width=4, norm_layer=None):
+        super(ResNeXtBottleneck, self).__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        width = int(planes * (base_width / 64.)) * groups
+        self.conv1 = nn.Conv2d(inplanes, width, kernel_size=1, stride=stride, bias=False)
+        self.bn1 = norm_layer(width)
+        self.conv2 = nn.Conv2d(width, width, kernel_size=3, stride=stride, padding=dilation, groups=groups, bias=False, dilation=dilation)
+        self.bn2 = norm_layer(width)
+        self.conv3 = nn.Conv2d(width, planes*expansion)
+        self.bn3 = norm_layer(planes*expansion)
+        self.relu = nn.ReLU(inplace=True)
+        self.downsample = downsample
+        self.stride = stride
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
+
 class SEBottleneck(Bottleneck):
     """
     Bottleneck for SENet154.

@@ -49,6 +49,7 @@ class Encoder(nn.Module):
         if opt.backbone == 'resnext50_32x4d':
             import torch
             resnet = torch.hub.load('pytorch/vision:v0.8.2', 'resnext50_32x4d', pretrained=True)
+            from blocks import ResNeXtBottleneck
         if opt.backbone == 'se_resnet50':
             import pretrainedmodels
             resnet = pretrainedmodels.__dict__['se_resnet50'](num_classes=1000, pretrained='imagenet')
@@ -82,18 +83,26 @@ class Encoder(nn.Module):
             res_p_conv5 = nn.Sequential(
                 SEResNetBottleneck(1024, 512, groups=1, reduction=16, stride=1, downsample=nn.Sequential(
                     nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
-                SEResNetBottleneck(2048, 512),
-                SEResNetBottleneck(2048, 512)
+                SEResNetBottleneck(2048, 512, reduction=16),
+                SEResNetBottleneck(2048, 512, reduction=16)
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
         if opt.backbone == 'se_resnext50_32x4d':
             res_g_conv5 = resnet.layer4
             res_p_conv5 = nn.Sequential(
-                SEResNeXtBottleneck(1024, 1024, groups=1, reduction=16, downsample=nn.Sequential(
+                SEResNeXtBottleneck(1024, 512, groups=32, reduction=16, downsample=nn.Sequential(
                     nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
-                SEResNeXtBottleneck(2048, 1024)
-                SEResNeXtBottleneck(2048, 1024)
+                SEResNeXtBottleneck(2048, 512, groups=32, reduction=16)
+                SEResNeXtBottleneck(2048, 512, groups=32, reduction=16)
                 )
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
+        if opt.backbone == 'resnext50_32x4d':
+            res_g_conv5 = resnet.layer4
+            res_p_conv5 = nn.Sequential(
+                ResNeXtBottleneck(1024, 512, groups=32, downsample=nn.Sequential(
+                    nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
+                ResNeXtBottleneck(2048, 512, groups=32)
+                ResNeXtBottleneck(2048, 512, groups=32)
+
         
         self.p0_id = nn.Sequential(copy.deepcopy(res_conv4), copy.deepcopy(res_g_conv5))
         self.p1_id = nn.Sequential(copy.deepcopy(res_conv4), copy.deepcopy(res_p_conv5))
