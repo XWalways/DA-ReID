@@ -1,11 +1,12 @@
 from .transforms import RandomErasing
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
-from .datasets import DataSet, ImageDataset
+from .datasets import DataSet, ImageDataset, MSMT17
 from .samplers import RandomIdentitySampler 
 import os
 import re
 
+#for market-1501, dukemtmc, cuhk03, msmt17 datasets 
 def make_data_loader(opt):
     train_transform = T.Compose([
         T.Resize((384, 128), interpolation=3),
@@ -28,7 +29,10 @@ def make_data_loader(opt):
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = DataSet(opt.data_path)
+    if opt.data_path != 'msmt17':
+        dataset = DataSet(opt.data_path)
+    else:
+        dataset = MSMT17(opt.data_path)
 
     num_classses = dataset.num_train_pids
     train_set = ImageDataset(dataset.train, train_transform)
