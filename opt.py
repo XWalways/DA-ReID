@@ -28,6 +28,18 @@ parser.add_argument('--triplet',
                    action='store_true',
                    help='use triplet loss or not')
 
+parser.add_argument('--center',
+                   action='store_true',
+                   help='use center loss or not')
+
+parser.add_argument('--labelsmooth',
+                   action='store_true',
+                   help='use label smooth or not')
+
+parser.add_argument('--bnneck',
+                   action='store_true',
+                   help='use bnneck or not')
+
 parser.add_argument('--backbone',
                     default='resnest50',
                     type=str,
@@ -116,7 +128,5 @@ parser.add_argument("--start",
                     default=0,
                     type=int,
                     help='start epoch')
-
-parser.add_argument("--stage2_weight_path", default='/model_stage2_200.pt')
 
 opt = parser.parse_args()

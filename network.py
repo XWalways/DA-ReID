@@ -84,24 +84,24 @@ class Encoder(nn.Module):
                 SEResNetBottleneck(1024, 512, groups=1, reduction=16, stride=1, downsample=nn.Sequential(
                     nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
                 SEResNetBottleneck(2048, 512, reduction=16),
-                SEResNetBottleneck(2048, 512, reduction=16)
+                SEResNetBottleneck(2048, 512, reduction=16))
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
         if opt.backbone == 'se_resnext50_32x4d':
             res_g_conv5 = resnet.layer4
             res_p_conv5 = nn.Sequential(
                 SEResNeXtBottleneck(1024, 512, groups=32, reduction=16, downsample=nn.Sequential(
                     nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
-                SEResNeXtBottleneck(2048, 512, groups=32, reduction=16)
-                SEResNeXtBottleneck(2048, 512, groups=32, reduction=16)
-                )
+                SEResNeXtBottleneck(2048, 512, groups=32, reduction=16),
+                SEResNeXtBottleneck(2048, 512, groups=32, reduction=16))
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
         if opt.backbone == 'resnext50_32x4d':
             res_g_conv5 = resnet.layer4
             res_p_conv5 = nn.Sequential(
                 ResNeXtBottleneck(1024, 512, groups=32, downsample=nn.Sequential(
                     nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
-                ResNeXtBottleneck(2048, 512, groups=32)
-                ResNeXtBottleneck(2048, 512, groups=32)
+                ResNeXtBottleneck(2048, 512, groups=32),
+                ResNeXtBottleneck(2048, 512, groups=32))
+            res_p_conv5.load_state_dict(resnet.layer4.state_dict())
 
         
         self.p0_id = nn.Sequential(copy.deepcopy(res_conv4), copy.deepcopy(res_g_conv5))
@@ -133,29 +133,37 @@ class Encoder(nn.Module):
         
         #BN Neck
         self.fc_fg_p0_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn1 = nn.BatchNorm1d(opt.feat_id)
-        self.bn1.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn1 = nn.BatchNorm1d(opt.feat_id)
+            self.bn1.bias.requires_grad_(False)
         self.fc_fg_p1_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn2 = nn.BatchNorm1d(opt.feat_id)
-        self.bn2.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn2 = nn.BatchNorm1d(opt.feat_id)
+            self.bn2.bias.requires_grad_(False)
         self.fc_f0_p1_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn3 = nn.BatchNorm1d(opt.feat_id)
-        self.bn3.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn3 = nn.BatchNorm1d(opt.feat_id)
+            self.bn3.bias.requires_grad_(False)
         self.fc_f1_p1_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn4 = nn.BatchNorm1d(opt.feat_id)
-        self.bn4.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn4 = nn.BatchNorm1d(opt.feat_id)
+            self.bn4.bias.requires_grad_(False)
         self.fc_fg_p2_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn5 = nn.BatchNorm1d(opt.feat_id)
-        self.bn5.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn5 = nn.BatchNorm1d(opt.feat_id)
+            self.bn5.bias.requires_grad_(False)
         self.fc_f0_p2_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn6 = nn.BatchNorm1d(opt.feat_id)
-        self.bn6.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn6 = nn.BatchNorm1d(opt.feat_id)
+            self.bn6.bias.requires_grad_(False)
         self.fc_f1_p2_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn7 = nn.BatchNorm1d(opt.feat_id)
-        self.bn7.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn7 = nn.BatchNorm1d(opt.feat_id)
+            self.bn7.bias.requires_grad_(False)
         self.fc_f2_p2_id = nn.Linear(opt.feat_id, int(opt.num_cls))
-        self.bn8 = nn.BatchNorm1d(opt.feat_id)
-        self.bn8.bias.requires_grad_(False)
+        if opt.bnneck:
+            self.bn8 = nn.BatchNorm1d(opt.feat_id)
+            self.bn8.bias.requires_grad_(False)
         
         self.p0_nid = nn.Sequential(copy.deepcopy(res_conv4), copy.deepcopy(res_g_conv5))
         self.p1_nid = nn.Sequential(copy.deepcopy(res_conv4), copy.deepcopy(res_p_conv5))
@@ -244,15 +252,25 @@ class Encoder(nn.Module):
         f0_p2_id = self.reduction_z0_p2_id(z0_p2_id).squeeze(dim=3).squeeze(dim=2)
         f1_p2_id = self.reduction_z1_p2_id(z1_p2_id).squeeze(dim=3).squeeze(dim=2)
         f2_p2_id = self.reduction_z2_p2_id(z2_p2_id).squeeze(dim=3).squeeze(dim=2)
-        
-        lg_p0 = self.fc_fg_p0_id(self.bn1(fg_p0_id))
-        lg_p1 = self.fc_fg_p1_id(self.bn2(fg_p1_id))
-        l0_p1 = self.fc_f0_p1_id(self.bn3(f0_p1_id))
-        l1_p1 = self.fc_f1_p1_id(self.bn4(f1_p1_id))
-        lg_p2 = self.fc_fg_p2_id(self.bn5(fg_p2_id))
-        l0_p2 = self.fc_f0_p2_id(self.bn6(f0_p2_id))
-        l1_p2 = self.fc_f1_p2_id(self.bn7(f1_p2_id))
-        l2_p2 = self.fc_f2_p2_id(self.bn8(f2_p2_id))
+       
+        if opt.bnneck:
+            lg_p0 = self.fc_fg_p0_id(self.bn1(fg_p0_id))
+            lg_p1 = self.fc_fg_p1_id(self.bn2(fg_p1_id))
+            l0_p1 = self.fc_f0_p1_id(self.bn3(f0_p1_id))
+            l1_p1 = self.fc_f1_p1_id(self.bn4(f1_p1_id))
+            lg_p2 = self.fc_fg_p2_id(self.bn5(fg_p2_id))
+            l0_p2 = self.fc_f0_p2_id(self.bn6(f0_p2_id))
+            l1_p2 = self.fc_f1_p2_id(self.bn7(f1_p2_id))
+            l2_p2 = self.fc_f2_p2_id(self.bn8(f2_p2_id))
+        else:
+            lg_p0 = self.fc_fg_p0_id(fg_p0_id)
+            lg_p1 = self.fc_fg_p1_id(fg_p1_id)
+            l0_p1 = self.fc_f0_p1_id(f0_p1_id)
+            l1_p1 = self.fc_f1_p1_id(f1_p1_id)
+            lg_p2 = self.fc_fg_p2_id(fg_p2_id)
+            l0_p2 = self.fc_f0_p2_id(f0_p2_id)
+            l1_p2 = self.fc_f1_p2_id(f1_p2_id)
+            l2_p2 = self.fc_f2_p2_id(f2_p2_id)
 
         ###################################### identity-unrelated ########################################
         p0_nid = self.p0_nid(x)

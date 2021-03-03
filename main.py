@@ -28,8 +28,8 @@ class Main():
 
         self.model = model.to(opt.device)
         self.loss = loss
-        
-                
+        if opt.center:
+            self.center_optimizer = torch.optim.SGD(self.loss.center_loss.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)        
         self.scheduler = lr_scheduler.MultiStepLR(loss.optimizer, milestones=opt.lr_scheduler, gamma=0.1)
         self.scheduler_D = lr_scheduler.MultiStepLR(loss.optimizer_D, milestones=opt.lr_scheduler, gamma=0.1)
 
@@ -49,8 +49,10 @@ class Main():
                 loss = self.loss(inputs, labels, batch)
                 loss.backward()
                 self.loss.optimizer.step()
+                if opt.center:
+                    self.center_optimizer.step()
                 
-            elif (opt.stage == 2) or (opt.stage == 3):
+            elif (opt.stage == 2) or (opt.stage == 3) :
                 self.loss.optimizer_D.zero_grad()
                 self.loss.optimizer.zero_grad()
                 G_loss = self.loss(inputs, labels, batch)
@@ -127,7 +129,7 @@ if __name__ == '__main__':
     
     model = Model()
     loss = Loss(model)
-    main = Main(model, loss, data)
+    main = Main(model, loss)
 
     if opt.mode == 'train':
         os.makedirs(opt.save_path, exist_ok=True)

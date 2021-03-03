@@ -12,7 +12,7 @@ class RandomIdentitySampler(sampler.Sampler):
         self.batch_id = batch_id
 
         self._id2index = collections.defaultdict(list)
-        for index, (_, pid,_) in enumerate(self.data_source):
+        for index, (_, pid) in enumerate(self.data_source):
             self._id2index[pid].append(index)
         self.pids = list(self._id2index.keys())
 

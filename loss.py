@@ -2,6 +2,7 @@ from torch.nn import CrossEntropyLoss, BCELoss, L1Loss, Tanh
 from torch.nn.modules import loss
 from utils.get_optimizer import get_optimizer
 import torch
+import torch.nn as nn
 from torch.distributions import normal
 import numpy as np
 import copy
@@ -20,6 +21,7 @@ class Loss(loss._Loss):
         self.bce_loss = BCELoss()
         self.cross_entropy_loss = CrossEntropyLoss()
         
+        self.center_loss = CenterLoss(num_classes=opt.num_cls)
         self.teacher = ft_net(opt.num_cls, droprate=0.5, stride=1)
         self.teacher.cuda()
         self.teacher.load_state_dict(torch.load('teacher.pth'))
@@ -107,18 +109,31 @@ class Loss(loss._Loss):
     
     def id_related_loss_1(self, labels, outputs, outputs_teacher, kl_type='avgloss'):
         #in stage 1, use KL, kl_type is avgloss or avgvec
-        CrossEntropy_Loss = [self.cross_entropy_loss(output, labels) for output in outputs[1:1+num_gran]]
+        #in stage 1, the better result is: labelsmooth, Triplet + Center + CE, Triplet + CE, Triplet + labelsmooth
+        if opt.labelsmooth:
+            CrossEntropy_Loss = [CrossEntropyLabelSmooth(num_classes=opt.num_cls)(output, labels) for output in outputs[1:1+num_gran]]
+        else:
+            CrossEntropy_Loss = [self.cross_entropy_loss(output, labels) for output in outputs[1:1+num_gran]]
+        Loss =  sum(CrossEntropy_Loss) / len(CrossEntropy_Loss)
         if kl_type == 'avgloss':
             kl_loss = nn.KLDivLoss(reduction='sum')
-            KD_Loss = [kl_loss(output, outputs_teacher)/output.size(0) for output in outputs[1:1+num_gran]]
-            return sum(CrossEntropy_Loss) / len(CrossEntropy_Loss) + 0.0001*sum(KD_Lsss) / len(KD_Loss)
-        if kl_typr == 'avgvec':
+            KD_Loss = [kl_loss(output, outputs_teacher[1])/output.size(0) for output in outputs[1:1+num_gran]]
+            Loss += 0.0001*sum(KD_Loss) / len(KD_Loss)
+        if kl_type == 'avgvec':
             mean_output = sum(outputs[1:1+num_gran])/num_gran
-            KD_Loss = kl_loss(mean_output, outputs_teacher)
-            return sum(CrossEntropy_Loss) / len(CrossEntropy_Loss) + 0.0001*KD_Loss
+            KD_Loss = kl_loss(mean_output, outputs_teacher[1])/mean_output.size(0)
+            Loss += 0.0001*KD_Loss
+        if opt.triplet:
+            Triplet_Loss = TripletLoss()(outputs[0], labels)[0]
+            Loss += Triplet_Loss
+        if opt.center:
+            Center_Loss = self.center_loss(outputs[0], labels)
+            Loss += 0.001*Center_Loss
+
+        return Loss
 
     def id_related_loss_3(self, labels, outputs):
-        #in stage 3 do not use KL
+        #in stage 3 do not use KL,or other tricks
         CrossEntropy_Loss = [self.cross_entropy_loss(output, labels) for output in outputs[1:1+num_gran]]
         return sum(CrossEntropy_Loss) / len(CrossEntropy_Loss)
 
@@ -248,3 +263,102 @@ class Loss(loss._Loss):
                 KL_loss.data.cpu().numpy()), end=' ')
             
         return loss_sum
+
+
+class CenterLoss(nn.Module):
+    def __init__(self, num_classes=751, feat_dim=2048, use_gpu=True):
+        super(CenterLoss, self).__init__()
+        self.num_classes = num_classes
+        self.feat_dim = feat_dim
+        self.use_gpu = use_gpu
+
+        if self.use_gpu:
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda())
+        else:
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
+    def forward(self, x, labels):
+        assert x.size(0) == labels.size(0), "features.size(0) is not equal to labels.size(0)"
+        batch_size = x.size(0)
+        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
+                torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
+        distmat.addmm_(1, -2, x, self.centers.t())
+        classes = torch.arange(self.num_classes).long()
+        if self.use_gpu: classes = classes.cuda()
+        labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
+        mask = labels.eq(classes.expand(batch_size, self.num_classes))
+
+        dist = distmat * mask.float()
+        loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
+
+        return loss
+
+
+def normalize(x, axis=-1):
+    x = 1. * x / (torch.norm(x, 2, axis, keepdim=True).expand_as(x) + 1e-12)
+    return x
+
+def euclidean_dist(x, y):
+    m, n = x.size(0), y.size(0)
+    xx = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n)
+    yy = torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
+    dist = xx + yy
+    dist.addmm_(1, -2, x, y.t())
+    dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
+    return dist
+
+def hard_example_mining(dist_mat, labels, return_inds=False):
+    assert len(dist_mat.size()) == 2
+    assert dist_mat.size(0) == dist_mat.size(1)
+    N = dist_mat.size(0)
+    is_pos = labels.expand(N, N).eq(labels.expand(N, N).t())
+    is_neg = labels.expand(N, N).ne(labels.expand(N, N).t())
+    dist_ap, relative_p_inds = torch.max(dist_mat[is_pos].contiguous().view(N, -1), 1, keepdim=True)
+    dist_an, relative_n_inds = torch.min(dist_mat[is_neg].contiguous().view(N, -1), 1, keepdim=True)
+    dist_ap = dist_ap.squeeze(1)
+    dist_an = dist_an.squeeze(1)
+    if return_inds:
+        ind = (labels.new().resize_as_(labels)
+                .copy_(torch.arange(0, N).long())
+                .unsqueeze(0).expand(N, N))
+        p_inds = torch.gather(
+                ind[is_pos].contiguous().view(N, -1), 1, relative_p_inds.data)
+        n_inds = torch.gather(
+                ind[is_neg].contiguous().view(N, -1), 1, relative_n_inds.data)
+        p_inds = p_inds.squeeze(1)
+        n_inds = n_inds.squeeze(1)
+        return dist_ap, dist_an, p_inds, n_inds
+    return dist_ap, dist_an
+
+class TripletLoss(object):
+    def __init__(self, margin=None):
+        self.margin = margin
+        if margin is not None:
+            self.ranking_loss = nn.MarginRankingLoss(margin=margin)
+        else:
+            self.ranking_loss = nn.SoftMarginLoss()
+    def __call__(self, global_feat, labels, normalize_feature=False):
+        if normalize_feature:
+            global_feat = normalize(global_feat, axis=-1)
+        dist_mat = euclidean_dist(global_feat, global_feat)
+        dist_ap, dist_an = hard_example_mining(dist_mat, labels)
+        y = dist_an.new().resize_as_(dist_an).fill_(1)
+        if self.margin is not None:
+            loss = self.ranking_loss(dist_an, dist_ap, y)
+        else:
+            loss = self.ranking_loss(dist_an - dist_ap, y)
+        return loss, dist_ap, dist_an
+
+class CrossEntropyLabelSmooth(nn.Module):
+    def __init__(self, num_classes, epsilon=0.1, use_gpu=True):
+        super(CrossEntropyLabelSmooth, self).__init__()
+        self.num_classes = num_classes
+        self.epsilon = epsilon
+        self.use_gpu = use_gpu
+        self.logsoftmax = nn.LogSoftmax(dim=1)
+    def forward(self, inputs, targets):
+        log_probs = self.logsoftmax(inputs)
+        targets = torch.zeros(log_probs.size()).scatter_(1, targets.unsqueeze(1).data.cpu(), 1)
+        if self.use_gpu: targets = targets.cuda()
+        targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
+        loss = (- targets * log_probs).mean(0).sum()
+        return loss
