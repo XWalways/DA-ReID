@@ -8,9 +8,9 @@ import logging
 import copy
 from tabulate import tabulate
 from termcolor import colored
-
+import os.path as osp
 #Support Market1501, CUHK03, DukeMTMC Person Re-ID Datasets
-__all__ = ['Market1501', 'CUHK03', 'DukeMTMC', 'MSMT17', 
+__all__ = ['Market1501', 'CUHK03', 'DukeMTMC', 'MSMT', 
            'VeRi', 'VehicleID', 'VeRiWild',
            'SmallVehicleID', 'MediumVehicleID', 'LargeVehicleID', 
            'SmallVeRiWild', 'MediumVeRiWild', 'LargeVeRiWild']
@@ -344,7 +344,7 @@ class CUHK03(ImageDataset):
 
         return data
 
-class MSMT17(ImageDataset):
+class MSMT(ImageDataset):
     """MSMT17.
     Reference:
         Wei et al. Person Transfer GAN to Bridge Domain Gap for Person Re-Identification. CVPR 2018.
@@ -417,7 +417,7 @@ class MSMT17(ImageDataset):
         #       do not add val images to the training set.
         if 'combineall' in kwargs and kwargs['combineall']:
             train += val
-        super(MSMT17, self).__init__(train, query, gallery, **kwargs)
+        super(MSMT, self).__init__(train, query, gallery, **kwargs)
 
 
     def process_dir(self, dir_path, list_path, is_train=True):

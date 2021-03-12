@@ -22,9 +22,11 @@ class Loss(loss._Loss):
         self.cross_entropy_loss = CrossEntropyLoss()
         
         self.center_loss = CenterLoss(num_classes=opt.num_cls)
-        self.teacher = ft_net(opt.num_cls, droprate=0.5, stride=1)
-        self.teacher.cuda()
-        self.teacher.load_state_dict(torch.load('teacher.pth'))
+        if opt.stage == 1:
+            self.teacher = ft_net(opt.num_cls, droprate=0.5, stride=1)
+            self.teacher.cuda()
+            self.teacher.load_state_dict(torch.load('teacher.pth'))
+        
         self.model = model
         
         self.optimizer, self.optimizer_D = get_optimizer(model)

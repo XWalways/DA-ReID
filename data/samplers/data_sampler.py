@@ -2,21 +2,23 @@ import random
 import collections
 from torch.utils.data import sampler
 
-class Sampler(sampler.Sampler):
+
+class NaiveIdentitySampler(sampler.Sampler):
     def __init__(self, data_source, batch_id, batch_image):
-        super(Sampler, self).__init__(data_source)
+        super(NaiveIdentitySampler, self).__init__(data_source)
 
         self.data_source = data_source
         self.batch_image = batch_image
         self.batch_id = batch_id
 
         self._id2index = collections.defaultdict(list)
-        for idx, path in enumerate(data_source.imgs):
-            _id = data_source.id(path)
-            self._id2index[_id].append(idx)
+        for index, (_, pid, _) in enumerate(self.data_source):
+            self._id2index[pid].append(index)
+        self.pids = list(self._id2index.keys())
 
     def __iter__(self):
-        unique_ids = self.data_source.unique_ids
+        unique_ids = sorted(set(self.pids))
+        random.shuffle(unique_ids)
 
         imgs = []
         for _id in unique_ids:
@@ -30,4 +32,4 @@ class Sampler(sampler.Sampler):
     def _sample(population, k):
         if len(population) < k:
             population = population * k
-        return population[:k]
+        return random.sample(population, k)
