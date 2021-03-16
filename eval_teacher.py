@@ -6,7 +6,7 @@ from scipy.spatial.distance import cdist
 import numpy as np
 #from utils.extract_feature import extract_feature
 from utils.metrics import mean_ap, cmc, re_ranking
-from model import ft_net
+from model_teacher import ft_net
 from data import make_data_loader
 from opt import opt
 
