@@ -329,10 +329,52 @@ class Encoder(nn.Module):
     
 class Generator(nn.Module):
     def __init__(self, name='dg'):
-        #name is 'dg' or 'res'
+        #name is 'dg' or 'res' or 'isgan'
         super(Generator, self).__init__()
         model = []
         self.name = name
+        if self.name == 'isgan':
+            self.G_fc = nn.Sequential(
+                nn.Linear(opt.feat_id*8 + opt.feat_nid*8 + opt.feat_niz + opt.num_cls, opt.feat_G*8),
+                nn.BatchNorm1d(opt.feat_G*8),
+                nn.LeakyReLU(0.2, True),
+                nn.Dropout(opt.dropout))
+
+            self.G_deconv = nn.Sequential(
+                # 1st block
+                nn.ConvTranspose2d(opt.feat_G*8, opt.feat_G*8, kernel_size=(6,2),bias=False),
+                nn.BatchNorm2d(opt.feat_G*8),
+                nn.LeakyReLU(0.2, True),
+                nn.Dropout(opt.dropout),
+                # 2nd block
+                nn.ConvTranspose2d(opt.feat_G*8, opt.feat_G*8, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(opt.feat_G*8),
+                nn.LeakyReLU(0.2, True),
+                nn.Dropout(opt.dropout),
+                # 3rd block
+                nn.ConvTranspose2d(opt.feat_G*8, opt.feat_G*8, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(opt.feat_G*8),
+                nn.LeakyReLU(0.2, True),
+                nn.Dropout(opt.dropout),
+                # 4th block
+                nn.ConvTranspose2d(opt.feat_G*8, opt.feat_G*4, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(opt.feat_G*4),
+                nn.LeakyReLU(0.2, True),
+                nn.Dropout(opt.dropout),
+                # 5th block
+                nn.ConvTranspose2d(opt.feat_G*4, opt.feat_G*2, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(opt.feat_G*2),
+                nn.LeakyReLU(0.2, True),
+                nn.Dropout(opt.dropout),
+                # 6th block
+                nn.ConvTranspose2d(opt.feat_G*2, opt.feat_G*1, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(opt.feat_G*1),
+                nn.LeakyReLU(0.2, True),
+                # 7th block
+                nn.ConvTranspose2d(opt.feat_G*1, 3, kernel_size=4, stride=2, padding=1, bias=False),
+                nn.Tanh())
+            init_weights(self.G_fc)
+            init_weights(self.G_deconv)
         if self.name == 'dg':
             self.G_fc = nn.Sequential(
                     nn.Linear(opt.feat_id*8 + opt.feat_nid*8 + opt.feat_niz + opt.num_cls, opt.feat_G*8),
@@ -432,6 +474,10 @@ class Generator(nn.Module):
             init_weights(self.G_deconv)
 
     def forward(self, inputs, labels):
+        if self.name == 'isgan':
+            x = torch.cat([inputs, labels], 1)
+            x = self.G_fc(x).view(-1, opt.feat_G*8, 1, 1)
+            x = self.G_deconv(x)
         if self.name == 'dg':
             x = torch.cat([inputs, labels], 1)
             x = self.G_fc(x).view(-1, opt.feat_G*8, 1, 1)
@@ -445,10 +491,13 @@ class Generator(nn.Module):
     
 class Discriminator(nn.Module):
     def __init__(self, IN='without'):
-        #IN is with or without
+        #IN is with or without or isgan
         super(Discriminator, self).__init__()
-
-        backbone = [nn.Tanh(), nn.Conv2d(3, opt.feat_D, kernel_size=3, stride=1, padding=1), nn.LeakyReLU(0.2, True)]
+        self.IN = IN
+        if IN != 'isgan':
+            backbone = [nn.Tanh(), nn.Conv2d(3, opt.feat_D, kernel_size=3, stride=1, padding=1), nn.LeakyReLU(0.2, True)]
+        else:
+            backbone = [nn.Tanh(), nn.Conv2d(3, opt.feat_D, kernel_size=4, stride=2, padding=1), nn.LeakyReLU(0.2, True)]
         if IN == 'without':
             backbone += [nn.Conv2d(opt.feat_D, opt.feat_D, kernel_size=3, stride=2, padding=1), nn.LeakyReLU(0.2, True)]
         if IN == 'with':
@@ -480,6 +529,17 @@ class Discriminator(nn.Module):
             backbone += [ResnetBlock(8*opt.feat_D, 8*opt.feat_D)]
             backbone += [NonlocalBlock(8*opt.feat_D)]
 
+        if IN == 'isgan':
+            nf_mult_prev = nf_mult
+            nf_mult = min(2**n, 8)
+            backbone += [
+                nn.Conv2d(
+                    opt.feat_D*nf_mult_prev, opt.feat_D*nf_mult, kernel_size=4,
+                    stride=2, padding=1, bias=True),
+                nn.InstanceNorm2d(opt.feat_D * nf_mult),
+                nn.LeakyReLU(0.2, True),]
+
+
         nf_mult_prev = nf_mult
         nf_mult = min(2**n_layers, 8)
 
@@ -497,23 +557,30 @@ class Discriminator(nn.Module):
                 opt.feat_D*nf_mult_prev, opt.feat_D*nf_mult, kernel_size=3,
                 stride=1, padding=1, bias=True),
             nn.InstanceNorm2d(opt.feat_D*nf_mult),]
-        self.avgp = nn.AdaptiveAvgPool2d(1)
+        if IN == 'isgan':
+            self.avgp = nn.AvgPool2d(kernel_size=(11, 3))
+        else:
+            self.avgp = nn.AdaptiveAvgPool2d(1)
         label_D2 = [nn.Linear(opt.feat_D*nf_mult, int(opt.num_cls))]
 
         self.backbone = nn.Sequential(*backbone)
         self.image_D = nn.Sequential(*image_D)
         self.label_D1 = nn.Sequential(*label_D1)
         self.label_D2 = nn.Sequential(*label_D2)
-
-        self.cnns = nn.ModuleList()
-        for _ in range(3):
-            self.cnns.append(self.backbone)
+        
+        if IN != 'isgan':
+            self.cnns = nn.ModuleList()
+            for _ in range(3):
+                self.cnns.append(self.backbone)
 
     def forward(self, input):
-        outputs = []
-        for model in self.cnns:
-            outputs.append(model(input))
-        backbone = sum(outputs)/len(outputs)
+        if self.IN == 'isgan':
+            backbone = self.backbone(input)
+        else:
+            outputs = []
+            for model in self.cnns:
+                outputs.append(model(input))
+            backbone = sum(outputs)/len(outputs)
 
         image_D = self.image_D(backbone)
         label_D1 = self.label_D1(backbone)
