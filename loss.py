@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.distributions import normal
 import numpy as np
 import copy
-from model import ft_net
+from model_teacher import ft_net
 from opt import opt
 
 batch_size = opt.batchid * opt.batchimage
