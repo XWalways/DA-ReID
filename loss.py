@@ -144,8 +144,10 @@ class Loss(loss._Loss):
         list_lv = outputs[-2]
         loss_KL = 0.
         for i in range(np.size(list_mu)):
+        #for i in range(len(list_mu)):
             loss_KL += torch.sum(0.5 * (list_mu[i]**2 + torch.exp(list_lv[i]) - list_lv[i] - 1))
         return loss_KL/np.size(list_mu)
+        #return loss_KL/len(list_mu)
     
     def GAN_loss(self, inputs, outputs, labels):
         id = outputs[0]
