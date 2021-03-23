@@ -25,7 +25,7 @@ class Loss(loss._Loss):
         if opt.stage == 1:
             self.teacher = ft_net(opt.num_cls, droprate=0.5, stride=1)
             self.teacher.cuda()
-            self.teacher.load_state_dict(torch.load('teacher.pth'))
+            self.teacher.load_state_dict(torch.load(opt.teacher))
         
         self.model = model
         
@@ -122,6 +122,7 @@ class Loss(loss._Loss):
             KD_Loss = [kl_loss(output, outputs_teacher[1])/output.size(0) for output in outputs[1:1+num_gran]]
             Loss += 0.0001*sum(KD_Loss) / len(KD_Loss)
         if kl_type == 'avgvec':
+            kl_loss = nn.KLDivLoss(reduction='sum')
             mean_output = sum(outputs[1:1+num_gran])/num_gran
             KD_Loss = kl_loss(mean_output, outputs_teacher[1])/mean_output.size(0)
             Loss += 0.0001*KD_Loss

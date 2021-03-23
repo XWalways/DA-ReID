@@ -129,4 +129,8 @@ parser.add_argument("--start",
                     type=int,
                     help='start epoch')
 
+parser.add_argument("--teacher",
+                    default='teacher.pth',
+                    type=str,
+                    help='teacher model for KD')
 opt = parser.parse_args()
