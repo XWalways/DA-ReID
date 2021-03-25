@@ -7,7 +7,6 @@ from torch.optim import lr_scheduler
 from utils.metrics import mean_ap, cmc, re_ranking
 from data import make_data_loader
 
-opt.epoch = 60
 model = ft_net(opt.num_cls, droprate=0.5, stride=1)
 model.cuda()
 train_loader, train_loader_woEr, test_loader, query_loader, dataset = make_data_loader(opt)
@@ -31,12 +30,14 @@ for epoch in range(opt.start+1, opt.epoch+1):
 
 
 name = ''
-if opt.data_path == 'Market-1501-v15.09.15':
+if 'Market-1501-v15.09.15' in opt.data_path:
     name += 'market'
-if opt.data_path == 'DukeMTMC-reID':
+if 'DukeMTMC-reID' in opt.data_path:
     name += 'dukemtmc'
-if opt.data_path == 'cuhk03':
+if 'cuhk03'in opt.data_path:
     name += 'cuhk03'
+if 'MSMT' in opt.data_path:
+    name += 'msmt'
 torch.save(model.cpu().state_dict(), 'teacher_{}.pth'.format(name))
 
 

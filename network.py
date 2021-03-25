@@ -530,14 +530,15 @@ class Discriminator(nn.Module):
             backbone += [NonlocalBlock(8*opt.feat_D)]
 
         if IN == 'isgan':
-            nf_mult_prev = nf_mult
-            nf_mult = min(2**n, 8)
-            backbone += [
-                nn.Conv2d(
-                    opt.feat_D*nf_mult_prev, opt.feat_D*nf_mult, kernel_size=4,
-                    stride=2, padding=1, bias=True),
-                nn.InstanceNorm2d(opt.feat_D * nf_mult),
-                nn.LeakyReLU(0.2, True),]
+            for n in range(1,5):
+                nf_mult_prev = nf_mult
+                nf_mult = min(2**n, 8)
+                backbone += [
+                    nn.Conv2d(
+                        opt.feat_D*nf_mult_prev, opt.feat_D*nf_mult, kernel_size=4,
+                        stride=2, padding=1, bias=True),
+                    nn.InstanceNorm2d(opt.feat_D * nf_mult),
+                    nn.LeakyReLU(0.2, True),]
 
 
         nf_mult_prev = nf_mult

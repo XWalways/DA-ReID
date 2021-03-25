@@ -30,7 +30,7 @@ def make_data_loader(opt):
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    if opt.data_path != 'msmt17':
+    if 'MSMT' not in opt.data_path:
         dataset = DataSet(opt.data_path)
     else:
         dataset = MSMT17(opt.data_path)

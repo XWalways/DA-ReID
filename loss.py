@@ -20,9 +20,10 @@ class Loss(loss._Loss):
         self.l1_loss = L1Loss()
         self.bce_loss = BCELoss()
         self.cross_entropy_loss = CrossEntropyLoss()
-        
-        self.center_loss = CenterLoss(num_classes=opt.num_cls)
-        if opt.stage == 1:
+        self.kd_type = opt.kd_type 
+        if opt.center:
+            self.center_loss = CenterLoss(num_classes=opt.num_cls)
+        if opt.stage == 1 and opt.teacher:
             self.teacher = ft_net(opt.num_cls, droprate=0.5, stride=1)
             self.teacher.cuda()
             self.teacher.load_state_dict(torch.load(opt.teacher))
@@ -109,7 +110,7 @@ class Loss(loss._Loss):
             self.set_parameter(self.model.G, train=True)
             self.set_parameter(self.model.D, train=True)
     
-    def id_related_loss_1(self, labels, outputs, outputs_teacher, kl_type='avgloss'):
+    def id_related_loss_1(self, labels, outputs, outputs_teacher):
         #in stage 1, use KL, kl_type is avgloss or avgvec
         #in stage 1, the better result is: labelsmooth, Triplet + Center + CE, Triplet + CE, Triplet + labelsmooth
         if opt.labelsmooth:
@@ -117,11 +118,11 @@ class Loss(loss._Loss):
         else:
             CrossEntropy_Loss = [self.cross_entropy_loss(output, labels) for output in outputs[1:1+num_gran]]
         Loss =  sum(CrossEntropy_Loss) / len(CrossEntropy_Loss)
-        if kl_type == 'avgloss':
+        if self.kd_type == 'avgloss':
             kl_loss = nn.KLDivLoss(reduction='sum')
             KD_Loss = [kl_loss(output, outputs_teacher[1])/output.size(0) for output in outputs[1:1+num_gran]]
             Loss += 0.0001*sum(KD_Loss) / len(KD_Loss)
-        if kl_type == 'avgvec':
+        if self.kd_type == 'avgvec':
             kl_loss = nn.KLDivLoss(reduction='sum')
             mean_output = sum(outputs[1:1+num_gran])/num_gran
             KD_Loss = kl_loss(mean_output, outputs_teacher[1])/mean_output.size(0)
@@ -144,10 +145,10 @@ class Loss(loss._Loss):
         list_mu = outputs[-3]
         list_lv = outputs[-2]
         loss_KL = 0.
-        for i in range(np.size(list_mu)):
+        for i in range(len(list_mu)):
         #for i in range(len(list_mu)):
             loss_KL += torch.sum(0.5 * (list_mu[i]**2 + torch.exp(list_lv[i]) - list_lv[i] - 1))
-        return loss_KL/np.size(list_mu)
+        return loss_KL/len(list_mu)
         #return loss_KL/len(list_mu)
     
     def GAN_loss(self, inputs, outputs, labels):
@@ -229,7 +230,10 @@ class Loss(loss._Loss):
         outputs = self.model.C(inputs)
                 
         if opt.stage == 1:
-            outputs_teacher = self.teacher(inputs)
+            if opt.teacher:
+                outputs_teacher = self.teacher(inputs)
+            else:
+                outputs_teacher = None
             CrossEntropy_Loss = self.id_related_loss_1(labels, outputs, outputs_teacher)
             loss_sum = CrossEntropy_Loss
             

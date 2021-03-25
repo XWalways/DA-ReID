@@ -78,20 +78,21 @@ class Main():
             return r, m_ap
 
         #########################   re rank##########################
-        q_g_dist = np.dot(qf, np.transpose(gf))
-        q_q_dist = np.dot(qf, np.transpose(qf))
-        g_g_dist = np.dot(gf, np.transpose(gf))
-        dist = re_ranking(q_g_dist, q_q_dist, g_g_dist)
+        if opt.rerank:
+            q_g_dist = np.dot(qf, np.transpose(gf))
+            q_q_dist = np.dot(qf, np.transpose(qf))
+            g_g_dist = np.dot(gf, np.transpose(gf))
+            dist = re_ranking(q_g_dist, q_q_dist, g_g_dist)
 
-        r, m_ap = rank(dist)
+            r, m_ap = rank(dist)
 
-        print('[With    Re-Ranking] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f}'
-              .format(m_ap, r[0], r[2], r[4], r[9]))
+            print('[With    Re-Ranking] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f}'
+                  .format(m_ap, r[0], r[2], r[4], r[9]))
 
-        with open(save_path, 'a') as f:
-            f.write(
-                '[With    Re-Ranking] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f}\n'
-                .format(m_ap, r[0], r[2], r[4], r[9]))
+            with open(save_path, 'a') as f:
+                f.write(
+                    '[With    Re-Ranking] mAP: {:.4f} rank1: {:.4f} rank3: {:.4f} rank5: {:.4f} rank10: {:.4f}\n'
+                    .format(m_ap, r[0], r[2], r[4], r[9]))
 
         #########################no re rank##########################
         dist = cdist(qf, gf)

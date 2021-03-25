@@ -40,12 +40,17 @@ parser.add_argument('--bnneck',
                    action='store_true',
                    help='use bnneck or not')
 
+parser.add_argument('--rerank',
+                    action='store_true',
+                    help='use reranking or not')
+
 parser.add_argument('--backbone',
                     default='resnest50',
                     type=str,
                     help='The BackBone Model')
 
 parser.add_argument('--lr',
+                    type=float,
                     default=2e-4,
                     help='initial learning_rate')
 
@@ -130,7 +135,13 @@ parser.add_argument("--start",
                     help='start epoch')
 
 parser.add_argument("--teacher",
-                    default='teacher.pth',
+                    default=None,
                     type=str,
                     help='teacher model for KD')
+
+parser.add_argument("--kd_type",
+                    default=None,
+                    type=str,
+                    help='KD type, avgloss or avgvec')
+
 opt = parser.parse_args()
