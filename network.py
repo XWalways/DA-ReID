@@ -55,7 +55,7 @@ class Encoder(nn.Module):
             resnet = pretrainedmodels.__dict__['se_resnet50'](num_classes=1000, pretrained='imagenet')
             from blocks import SEResNetBottleneck
        
-        if opt.backbone != 'se_resnext50_32x4d' or opt.backbone != 'se_resnet50':
+        if opt.backbone != 'se_resnext50_32x4d' and opt.backbone != 'se_resnet50':
             self.backbone = nn.Sequential(
                 resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
                 resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
@@ -89,8 +89,8 @@ class Encoder(nn.Module):
             res_p_conv5 = nn.Sequential(
                 SEResNetBottleneck(1024, 512, groups=1, reduction=16, stride=1, downsample=nn.Sequential(
                     nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
-                SEResNetBottleneck(2048, 512, reduction=16),
-                SEResNetBottleneck(2048, 512, reduction=16))
+                SEResNetBottleneck(2048, 512, groups=1, reduction=16),
+                SEResNetBottleneck(2048, 512, groups=1, reduction=16))
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
         if opt.backbone == 'se_resnext50_32x4d':
             res_g_conv5 = resnet.layer4
