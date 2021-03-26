@@ -54,10 +54,16 @@ class Encoder(nn.Module):
             import pretrainedmodels
             resnet = pretrainedmodels.__dict__['se_resnet50'](num_classes=1000, pretrained='imagenet')
             from blocks import SEResNetBottleneck
-        
-        self.backbone = nn.Sequential(
-            resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
-            resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
+       
+        if opt.backbone != 'se_resnext50_32x4d' or opt.backbone != 'se_resnet50':
+            self.backbone = nn.Sequential(
+                resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
+                resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
+        else:
+            self.backbone = nn.Sequential(
+                resnet.layer0,
+                resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
+
         res_conv4 = nn.Sequential(*resnet.layer3[1:])
         
         if opt.backbone == 'resnet50':
