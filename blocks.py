@@ -62,8 +62,8 @@ class ResNeXtBottleneck(nn.Module):
         self.bn1 = norm_layer(width)
         self.conv2 = nn.Conv2d(width, width, kernel_size=3, stride=stride, padding=dilation, groups=groups, bias=False, dilation=dilation)
         self.bn2 = norm_layer(width)
-        self.conv3 = nn.Conv2d(width, planes*expansion)
-        self.bn3 = norm_layer(planes*expansion)
+        self.conv3 = nn.Conv2d(width, planes*self.expansion, kernel_size=1, stride=stride, bias=False)
+        self.bn3 = norm_layer(planes*self.expansion)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
