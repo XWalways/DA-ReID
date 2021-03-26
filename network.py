@@ -14,8 +14,8 @@ class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
         self.C = Encoder()
-        self.G = Generator(name='dg')
-        self.D = Discriminator(IN='without')
+        self.G = Generator(name=opt.gen_type) #'dg', 'res', 'isgan'
+        self.D = Discriminator(IN=opt.dis_type) #'with', 'without', 'isgan'
                 
 def weights_init_normal(m):
         classname = m.__class__.__name__

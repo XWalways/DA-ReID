@@ -144,4 +144,14 @@ parser.add_argument("--kd_type",
                     type=str,
                     help='KD type, avgloss or avgvec')
 
+parser.add_argument("--gen_type",
+                    default='dg',
+                    type=str,
+                    help='Generator type, dg or res or isgan')
+
+parser.add_argument("--dis_type",
+                    default='without',
+                    type=str,
+                    help='Discriminator type, isgan or with or without')
+
 opt = parser.parse_args()
