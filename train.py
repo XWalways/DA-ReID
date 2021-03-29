@@ -4,7 +4,7 @@ import os
 from models import build_model, Checkpointer, PeriodicCheckpointer
 from solver import build_lr_scheduler, build_optimizer
 from data import build_reid_test_loader, build_reid_train_loader
-from evaluate import ReidEvaluator, inference_on_dataset
+from evaluation import ReidEvaluator, inference_on_dataset
 from configs import cfg
 from torch.utils.tensorboard import SummaryWriter
 from tabulate import tabulate
@@ -98,14 +98,14 @@ def train(cfg, model, logger):
 
 def get_evaluator(cfg, dataset_name, output_dir=None):
     data_loader, num_query = build_reid_test_loader(cfg, dataset_name)
-    return data_loader, ReidEvaluator(cfg, num_query, output_dir)
+    return data_loader, ReidEvaluator(cfg, num_query, dataset=None, output_dir=output_dir)
 
 def test(cfg, model, logger):
     logger.info('Start Evaluating....')
     results = OrderedDict()
     for idx, dataset_name in enumerate(cfg.datasets_test):
         data_loader, evaluator = get_evaluator(cfg, dataset_name)
-        results_i = inference_on_dataset(model, data_loader, evaluator, flip_test=cfg.flip_test)
+        results_i = inference_on_dataset(model, data_loader, evaluator, dataset=None, flip_test=cfg.flip_test)
         results[dataset_name] = results_i
     print_csv_format(results, logger)
     if len(results) == 1: results = list(results.values())[0]
