@@ -2,11 +2,8 @@ import sys
 import timeit
 import numpy as np
 import os.path as osp
-
-sys.path.insert(0, osp.dirname(osp.abspath(__file__)) + '/../../..')
-
-from fastreid.evaluation import evaluate_rank
-from fastreid.evaluation import evaluate_roc
+sys.path.append('../')
+from rank import evaluate_rank
 
 """
 Test the speed of cython-based evaluation code. The speed improvements
@@ -18,14 +15,12 @@ This is normal because the inputs are random numbers. Just try again.
 """
 
 print('*** Compare running time ***')
-
-setup = '''
+setup='''
 import sys
 import os.path as osp
+sys.path.append('../')
+from rank import evaluate_rank
 import numpy as np
-sys.path.insert(0, osp.dirname(osp.abspath(__file__)) + '/../../..')
-from fastreid.evaluation import evaluate_rank
-from fastreid.evaluation import evaluate_roc
 num_q = 30
 num_g = 300
 dim = 512
@@ -56,20 +51,6 @@ print('Python time: {} s'.format(pytime))
 print('Cython time: {} s'.format(cytime))
 print('CMC Cython is {} times faster than python\n'.format(pytime / cytime))
 
-print('=> Using ROC metric')
-pytime = timeit.timeit(
-    'evaluate_roc(distmat, q_pids, g_pids, q_camids, g_camids, use_cython=False)',
-    setup=setup,
-    number=20
-)
-cytime = timeit.timeit(
-    'evaluate_roc(distmat, q_pids, g_pids, q_camids, g_camids, use_cython=True)',
-    setup=setup,
-    number=20
-)
-print('Python time: {} s'.format(pytime))
-print('Cython time: {} s'.format(cytime))
-print('ROC Cython is {} times faster than python\n'.format(pytime / cytime))
 
 print("=> Check precision")
 num_q = 30
@@ -95,12 +76,7 @@ np.testing.assert_allclose(mAP_py, mAP_cy, rtol=1e-3, atol=1e-6)
 np.testing.assert_allclose(mINP_py, mINP_cy, rtol=1e-3, atol=1e-6)
 print('Rank results between python and cython are the same!')
 
-scores_cy, labels_cy = evaluate_roc(distmat, q_pids, g_pids, q_camids, g_camids, use_cython=True)
-scores_py, labels_py = evaluate_roc(distmat, q_pids, g_pids, q_camids, g_camids, use_cython=False)
 
-np.testing.assert_allclose(scores_cy, scores_py, rtol=1e-3, atol=1e-6)
-np.testing.assert_allclose(labels_cy, labels_py, rtol=1e-3, atol=1e-6)
-print('ROC results between python and cython are the same!\n')
 
 print("=> Check exact values")
-print("mAP = {} \ncmc = {}\nmINP = {}\nScores = {}".format(np.array(mAP_cy), cmc_cy, np.array(mINP_cy), scores_cy))
+print("mAP = {} \ncmc = {}\nmINP = {}".format(np.array(mAP_cy), cmc_cy, np.array(mINP_cy)))
