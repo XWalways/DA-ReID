@@ -41,8 +41,8 @@ checkpoint = torch.load(os.path.join(opt.save_path, opt.weight))
 model.C.load_state_dict(checkpoint['model_C'], strict=False)
 model.eval()
 print('extract features, this may take a few minutes')
-query_feature = extract_feature(model, tqdm(query_loader))
-gallery_feature = extract_feature(model, tqdm(test_loader))
+query_features = extract_feature(model, tqdm(query_loader))
+gallery_features = extract_feature(model, tqdm(test_loader))
 
 dist = build_dist(query_features, gallery_features)
 
