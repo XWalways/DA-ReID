@@ -14,11 +14,10 @@ from .rank import evaluate_rank
 
 
 class ReidEvaluator(object):
-    def __init__(self, cfg, num_query, dataset=None, output_dir=None):
+    def __init__(self, cfg, num_query, output_dir=None):
         self.cfg = cfg
         self._num_query = num_query
         self._output_dir = output_dir
-        self.dataset = dataset
 
         self.features = []
         self.pids = []
@@ -30,14 +29,9 @@ class ReidEvaluator(object):
         self.camids = []
 
     def process(self, inputs, outputs):
-        if self.dataset == None:
-            self.pids.extend(inputs["targets"])
-            self.camids.extend(inputs["camids"])
-            self.features.append(outputs.cpu())
-        else:
-            self.pids.extend(self.dataset.train_pids)
-            self.camids.extend(self.dataset.train_cams)
-            self.features.append(outputs.cpu())
+        self.pids.extend(inputs["targets"])
+        self.camids.extend(inputs["camids"])
+        self.features.append(outputs.cpu())
 
     def evaluate(self):
         features = self.features
@@ -129,26 +123,17 @@ def inference_context(model):
     model.train(training_mode)
 
 
-def inference_on_dataset(model, data_loader, evaluator, dataset=None, flip_test=False):
+def inference_on_dataset(model, data_loader, evaluator, flip_test=False):
     total = len(data_loader)
     evaluator.reset()
     with inference_context(model), torch.no_grad():
-        if dataset == None:
-            for idx, inputs in enumerate(data_loader):
-                outputs = model(inputs)
-                if flip_test:
-                    inputs["images"] = inputs["images"].flip(dims=[3])
-                    flip_outputs = model(inputs)
-                    outputs = (outputs + flip_outputs) / 2
-            evaluator.process(inputs, outputs)
-        else:
-            for idx, (inputs, labels) in enumerate(data_loader):
-                outputs = model(inputs)
-                if flip_test:
-                    inputs = inputs.flip(dims=[3])
-                    flip_outputs = model(inputs)
-                    outputs = (outputs + flip_outputs) / 2
-            evaluator.process(inputs, outputs)
+        for idx, inputs in enumerate(data_loader):
+            outputs = model(inputs)
+            if flip_test:
+                inputs["images"] = inputs["images"].flip(dims=[3])
+                flip_outputs = model(inputs)
+                outputs = (outputs + flip_outputs) / 2
+        evaluator.process(inputs, outputs)
 
     results = evaluator.evaluate()
 
