@@ -41,23 +41,15 @@ def make_data_loader(opt):
     test_set = ImageDataset(dataset.gallery, test_transform)
     query_set = ImageDataset(dataset.query, test_transform)
     
-    if opt.triplet:
-        train_loader = DataLoader(
-                train_set,
-                sampler=RandomIdentitySampler(train_set, batch_id=opt.batchid, batch_image=opt.batchimage),
-                batch_size=opt.batchid * opt.batchimage, num_workers=opt.num_workers, pin_memory=True)
+    train_loader = DataLoader(
+            train_set,
+            sampler=RandomIdentitySampler(train_set, batch_id=opt.batchid, batch_image=opt.batchimage),
+            batch_size=opt.batchid * opt.batchimage, num_workers=opt.num_workers, pin_memory=True)
         
-        train_loader_woEr = DataLoader(
-                train_set_woEr,
-                sampler=RandomIdentitySampler(train_set_woEr, batch_id=opt.batchid, batch_image=opt.batchimage),
-                batch_size=opt.batchid * opt.batchimage, num_workers=opt.num_workers, pin_memory=True)
-    else:
-        train_loader = DataLoader(
-                train_set,
-                batch_size=opt.batchid*opt.batchimage, num_workers=opt.num_workers, pin_memory=True)
-        train_loader_woEr = DataLoader(
-                train_set_woEr,
-                batch_size=opt.batchid*opt.batchimage, num_workers=opt.num_workers, pin_memory=True)
+    train_loader_woEr = DataLoader(
+            train_set_woEr,
+            sampler=RandomIdentitySampler(train_set_woEr, batch_id=opt.batchid, batch_image=opt.batchimage),
+            batch_size=opt.batchid * opt.batchimage, num_workers=opt.num_workers, pin_memory=True)
 
     test_loader = DataLoader(
         test_set, batch_size=opt.batchtest, num_workers=opt.num_workers, pin_memory=True)

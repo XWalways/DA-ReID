@@ -1,5 +1,4 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 import torch
 from tqdm import tqdm
 from scipy.spatial.distance import cdist
@@ -10,13 +9,11 @@ from model_teacher import ft_net
 from data import make_data_loader
 from opt import opt
 
-opt.data_path = 'DukeMTMC-reID'
 train_loader, train_loader_woEr, test_loader, query_loader, dataset = make_data_loader(opt)
-#model = ft_net(class_num=702, droprate=0.5, stride=1)
-model = ft_net(class_num=702)
+model = ft_net(class_num=opt.num_cls, droprate=0.5, stride=1)
 model.eval()
 model.cuda()
-model.load_state_dict(torch.load('./teacher_dukemtmc.pth'))
+model.load_state_dict(torch.load(opt.teacher))
 
 
 print('extract features, this may take a few minutes')
