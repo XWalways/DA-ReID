@@ -56,7 +56,7 @@ class Encoder(nn.Module):
             from blocks import SEResNetBottleneck
         if opt.backbone == 'sk_resnext50_32x4d':
             import timm
-            resnet = timm.create_model('sk_resnext50_32x4d', pretrained=True)
+            resnet = timm.create_model('skresnext50_32x4d', pretrained=True)
             from timm.models.sknet import SelectiveKernelBottleneck
         if opt.backbone == 'ibn_resnet50':
             resnet = torch.hub.load('XingangPan/IBN-Net', 'resnet50_ibn_a', pretrained=True)
@@ -66,9 +66,7 @@ class Encoder(nn.Module):
             resnet = iresnet50(pretrained=True)
 
        
-        if opt.backbone == 'resnet50' or opt.backbone == 'resnest50' or 
-           opt.backbone == 'resnext50_32x4d' or opt.backbone == 'ibn_resnet50' or 
-           opt.backbone == 'iresnet50':
+        if opt.backbone == 'resnet50' or opt.backbone == 'resnest50' or opt.backbone == 'resnext50_32x4d' or opt.backbone == 'ibn_resnet50' or opt.backbone == 'iresnet50':
             self.backbone = nn.Sequential(
                 resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
                 resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
