@@ -54,12 +54,29 @@ class Encoder(nn.Module):
             import pretrainedmodels
             resnet = pretrainedmodels.__dict__['se_resnet50'](num_classes=1000, pretrained='imagenet')
             from blocks import SEResNetBottleneck
+        if opt.backbone == 'sk_resnext50_32x4d':
+            import timm
+            resnet = timm.create_model('sk_resnext50_32x4d', pretrained=True)
+            from timm.models.sknet import SelectiveKernelBottleneck
+        if opt.backbone == 'ibn_resnet50':
+            resnet = torch.hub.load('XingangPan/IBN-Net', 'resnet50_ibn_a', pretrained=True)
+            from ibn_resnet import Bottleneck_IBN
+        if opt.backbone == 'iresnet50':
+            from iresnet import iresnet50, Bottleneck
+            resnet = iresnet50(pretrained=True)
+
        
-        if opt.backbone != 'se_resnext50_32x4d' and opt.backbone != 'se_resnet50':
+        if opt.backbone == 'resnet50' or opt.backbone == 'resnest50' or 
+           opt.backbone == 'resnext50_32x4d' or opt.backbone == 'ibn_resnet50' or 
+           opt.backbone == 'iresnet50':
             self.backbone = nn.Sequential(
                 resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
                 resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
-        else:
+        elif opt.backbone == 'sk_resnext50_32x4d':
+            self.backbone = nn.Sequential(
+                resnet.conv1, resnet.bn1, resnet.act1, resnet.maxpool,
+                resnet.layer1, resnet.layer2, resnet.layer3[0],)
+        elif opt.backbone == 'se_resnext50_32x4d' or opt.backbone == 'se_resnet50':
             self.backbone = nn.Sequential(
                 resnet.layer0,
                 resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
@@ -108,6 +125,34 @@ class Encoder(nn.Module):
                 ResNeXtBottleneck(2048, 512, groups=32),
                 ResNeXtBottleneck(2048, 512, groups=32))
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
+        if opt.backbone == 'sk_resnext50_32x4d':
+            res_g_conv5 = resnet.layer4
+            res_p_conv5 = nn.Sequential(
+                SelectiveKernelBottleneck(1024, 512, base_width=4, cardinality=32, stride=1, downsample=nn.Sequential(
+                    nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
+                SelectiveKernelBottleneck(2048, 512, base_width=4, cardinality=32),
+                SelectiveKernelBottleneck(2048, 512, base_width=4, cardinality=32),
+                )
+            res_p_conv5.load_state_dict(resnet.layer4.state_dict())
+        if opt.backbone == 'ibn_resnet50':
+            res_g_conv5 = resnet.layer4
+            res_p_conv5 = nn.Sequential(
+                Bottleneck_IBN(1024, 512, stride=1, downsample=nn.Sequential(
+                    nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
+                Bottleneck_IBN(2048, 512),
+                Bottleneck_IBN(2048, 512))
+            res_p_conv5.load_state_dict(resnet.layer4.state_dict())
+        if opt.backbone == 'iresnet50':
+            res_g_conv5 = resnet.layer4
+            res_p_conv5 = nn.Sequential(
+                Bottleneck(1024, 512, stride=1, downsample=nn.Sequential(
+                    nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False),
+                    nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
+                Bottleneck(2048, 512),
+                Bottleneck(2048, 512))
+            res_p_conv5.load_state_dict(resnet.layer4.state_dict())
+
+
 
         
         self.p0_id = nn.Sequential(copy.deepcopy(res_conv4), copy.deepcopy(res_g_conv5))
