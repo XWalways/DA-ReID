@@ -66,7 +66,7 @@ class Encoder(nn.Module):
             resnet = iresnet50(pretrained=True)
 
        
-        if opt.backbone == 'resnet50' or opt.backbone == 'resnest50' or opt.backbone == 'resnext50_32x4d' or opt.backbone == 'ibn_resnet50' or opt.backbone == 'iresnet50':
+        if opt.backbone == 'resnet50' or opt.backbone == 'resnest50' or opt.backbone == 'resnext50_32x4d' or opt.backbone == 'ibn_resnet50':
             self.backbone = nn.Sequential(
                 resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
                 resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
@@ -78,6 +78,10 @@ class Encoder(nn.Module):
             self.backbone = nn.Sequential(
                 resnet.layer0,
                 resnet.layer1, resnet.layer2, resnet.layer3[0],) # conv4_1
+        elif opt.backbone == 'iresnet50':
+            self.backbone = nn.Sequential(
+                resnet.conv1, resnet.bn1, resnet.relu,
+                resnet.layer1, resnet.layer2, resnet.layer3[0],)
 
         res_conv4 = nn.Sequential(*resnet.layer3[1:])
         
@@ -143,11 +147,11 @@ class Encoder(nn.Module):
         if opt.backbone == 'iresnet50':
             res_g_conv5 = resnet.layer4
             res_p_conv5 = nn.Sequential(
-                Bottleneck(1024, 512, stride=1, downsample=nn.Sequential(
-                    nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False),
-                    nn.Conv2d(1024, 2048, 1, bias=False), nn.BatchNorm2d(2048))),
-                Bottleneck(2048, 512),
-                Bottleneck(2048, 512))
+                Bottleneck(1024, 512, stride=1, start_block=True, exclude_bn0=False, downsample=nn.Sequential(
+                    nn.MaxPool2d(kernel_size=1, stride=1),
+                    nn.Conv2d(1024, 2048, 1, stride=1, bias=False), nn.BatchNorm2d(2048))),
+                Bottleneck(2048, 512, exclude_bn0=True, start_block=False, end_block=False),
+                Bottleneck(2048, 512, end_block=True))
             res_p_conv5.load_state_dict(resnet.layer4.state_dict())
 
 
